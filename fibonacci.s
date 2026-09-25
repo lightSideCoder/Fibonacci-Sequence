@@ -10,14 +10,14 @@ global _start
 _start:
 	lea		rsi, [buf + 23]	;rsi zeigt aufs Ende des Buffers
 	mov byte	[rsi], 0	;schreibt '\0' (1 byte)
-	mov		r15, 0		;erste fibo-nummer ist 0
+	xor		r15, r15	;erste fibo-nummer ist 0
 	mov		r14, 1		;zweite fibo-nummer ist 1
 
 	mov		rdi, 10		;Vorbereitung für Division (itoa)
 
 itoa: 					;macht aus Bytes eine Dezimalzahl.
-;In: rax = Zahl in Binär, rdi = 0
-;Out: rax = Ergebnis der Division, rdx = Rest der Division
+;In:	rax = Zahl in Binär, rdi = 0
+;Out:	rax = Ergebnis der Division, rdx = Rest der Division
 
 	xor		rdx, rdx	;rdx muss 0 sein für eine korrekte Division
 	div		rdi		;Ergebnis geht in rax, Rest geht in rdx
@@ -28,8 +28,8 @@ itoa: 					;macht aus Bytes eine Dezimalzahl.
 	jne		itoa		;falls noch nicht fertig, gehe an den Anfang der Funktion
 
 buflen:					;errechnet die Länge unserer ascii-Zahl, relativ zum '\0' am Ende
-;					In: rsi = Bufferpointer
-;					Out: r13 = Anzahl der Ziffern unserer ascii-Zahl
+;In:	rsi = Bufferpointer
+;Out:	r13 = Anzahl der Ziffern unserer ascii-Zahl
 
 	mov		cl, [rsi]	;lädt den Byte, auf den rsi zeigt in rcx
 	cmp		cl, 0		;ist dieser Byte '\0' ?
@@ -39,8 +39,9 @@ buflen:					;errechnet die Länge unserer ascii-Zahl, relativ zum '\0' am Ende
 	jmp		buflen		;geht an den Anfang der Funktion
 
 print:					;ganz klassisch: schreibt unseren Buffer auf stdout
-;					In:	rsi = Bufferpointer, r13 = Anzahl der Bytes, die wir schreiben
-;					Out:	rax = Anzahl der geschriebenen Bytes
+;In:	rsi = Bufferpointer, r13 = Anzahl der Bytes, die wir schreiben
+;Out:	rax = Anzahl der geschriebenen Bytes
+
 	sub		rsi, r13	;da rsi gerade aufs Ende zeigt ('\0'), addieren wir r13 > rsi zeigt auf Anfang des Buffers
 	mov		rax, 1		;fd = stdout
 	mov		rdi, 1		;sys write
@@ -50,8 +51,8 @@ print:					;ganz klassisch: schreibt unseren Buffer auf stdout
 	xor		r13, r13	;counter wieder auf 0
 
 printNewL:				;schreibt 'Enter' ans Ende einer Dezimalzahl
-;					In: rdi = sys write (1)
-;					Out: rax = Anzahl der geschriebenen Bytes
+;In:	rdi = sys write (1)
+;Out:	rax = Anzahl der geschriebenen Bytes
 
 	mov		rax, 1		;fd = stdout
 	mov		rdx, 1		;Anzahl der zu schreibenden Bytes
@@ -61,8 +62,8 @@ printNewL:				;schreibt 'Enter' ans Ende einer Dezimalzahl
 	mov		rsi, r12	;r12 wieder in rsi laden
 
 calcFibo:				;hier errechnen wir die nächste Zahl der Fibonacci-Reihe, die letzten beiden Zahlen addiert ergeben die neue Zahl
-;;In: r15 (a) = alte, hohe Zahl, r14 (b) = alte, niedrige Zahl
-;Out: r15 = neue, hohe Zahl, r14 = neue, niedrige Zahl
+;In:	r15 (a) = alte, hohe Zahl, r14 (b) = alte, niedrige Zahl
+;Out:	r15 = neue, hohe Zahl, r14 = neue, niedrige Zahl
 
 	mov		r11, r15	;c = a		> temp a in c speichern
 	add		r15, r14	;a = a + b	> neue, hohe Zahl
