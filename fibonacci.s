@@ -1,109 +1,85 @@
 default rel
 
 section .data
-	str: times 20 db 0
-	newline db 10
+	buf:	times 24 db 0		;wir reservieren 24 bytes
+	newl:	db 0xa			;wir initialisieren 1 byte für new Line
 
 section .text
 global _start
 
 _start:
-	xor	r8, r8		;init a = 0 for first calculation
-	mov	rax, 1		;init b = 1 for first calculation
-	mov	rdi, str	;buffer adress to rdi
-	call calc_fibo
+	lea		rsi, [buf + 23]	;rsi zeigt aufs Ende des Buffers
+	mov byte	[rsi], 0	;schreibt '\0' (1 byte)
+	mov		r15, 0		;erste fibo-nummer ist 0
+	mov		r14, 1		;zweite fibo-nummer ist 1
 
+	mov		rdi, 10		;Vorbereitung für Division (itoa)
 
+itoa: 					;macht aus Bytes eine Dezimalzahl.
+;In: rax = Zahl in Binär, rdi = 0
+;Out: rax = Ergebnis der Division, rdx = Rest der Division
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;CALCULATE THE FIBONACCI SEQUENCE;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;set	 r9=rax, calculate rax+r8, set r8=r9 and then call the IntToString-function, then Print-function and then loop
-;;;;;;;;;In:	r8=1st operand
-;;;;;;;;;		rax=2nd operand
-;;;;;;;;;Out:	rax=fibonacci numbers
-calc_fibo:
-	mov	r9, rax		;c = b
-	add	rax, r8		;b = b + a, sum to rax
-	mov	r8, r9		;a = c, move previous num to r8
-	mov	r10, rax	;save the result in r10
+	xor		rdx, rdx	;rdx muss 0 sein für eine korrekte Division
+	div		rdi		;Ergebnis geht in rax, Rest geht in rdx
+	add		rdx, 48		;addiert 48 (0x30) auf die Binärzahl. Lädt den Wert in rdx
+	dec		rsi		;rsi zeigt auf eine Stelle weiter im Buffer
+	mov byte	[rsi], dl	;lädt rdx (1 byte) in den Buffer
+	cmp		rax, 0		;ist rax == 0 ?
+	jne		itoa		;falls noch nicht fertig, gehe an den Anfang der Funktion
 
-	mov	rdi, str
-	call int_to_str
+buflen:					;errechnet die Länge unserer ascii-Zahl, relativ zum '\0' am Ende
+;					In: rsi = Bufferpointer
+;					Out: r13 = Anzahl der Ziffern unserer ascii-Zahl
 
-;	mov	rax, r10
-	call write
-	mov	rax, r10
-	cmp	rax, 10		;set upper level	
-	jge exit
-	jmp calc_fibo
+	mov		cl, [rsi]	;lädt den Byte, auf den rsi zeigt in rcx
+	cmp		cl, 0		;ist dieser Byte '\0' ?
+	je		print		;falls ja gehen wir zu 'print', falls nicht einfach weiter machen:
+	inc		r13		;incrementet r13. Verfolgt wie viele 'nicht NULL-Bytes' wir zählen
+	inc		rsi		;rsi zeigt auf die nächste Stelle im Buffer
+	jmp		buflen		;geht an den Anfang der Funktion
 
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;CONVERT AN INTEGER INTO A STRING;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;In:	rax=int to convert
-;;;;;;;;;		rdi=adress of buffer
-;;;;;;;;;Out:	rsi=start adress of string
-;;;;;;;;;		rdx=length of string
-int_to_str:
-	push	rbx
-	mov	rbx, rdi		;adress of buffer to rbx
-	add	rbx, 19			;point to end of buffer (+19Bytes)
-	mov byte [rbx], 0	;Null-terminate the buffer, puts a 0 in the last byte of buffer
-	dec	rbx				;move to index 18
-
-	;if num is 0:
-	cmp	rax, 0			;is num = 0?
-	je	.zero_case		;then jump to func
-	jmp	.extract_digits
-
-
-.zero_case:
-	mov byte [rbx], 0x30
-	dec	rbx				;adjust buffer pointer
-
-
-.extract_digits:
-	xor	rdx, rdx		;clear rdx(for division)
-	mov	rcx, 10			;divisor = 10
-	div	rcx				;rax = quotient, rdx = remainder (0-9)
-	add	dl, 0x30		;convert remainder to ASCII (0x30 = '0')
-	mov	[rbx], dl		;store ASCII digit in buffer
-	dec	rbx				;move left in buffer for next digit
-	cmp	rax, 0			;stop when quotient (rax) is 0
-	jne .extract_digits	;repeat if more digits
-	jmp .calc_length
-
-
-.calc_length:
-	inc	rbx				;move past the last written digit (start of str)
-	mov	rsi, rbx		;rsi = start address of the string
-	mov 	rdx, rdi
-	add	rdx, 19
-	sub	rdx, rbx		;length = end of buffer - start of string
-	pop	rbx
-	ret					;return to _start
-
-
-
-	;writes a string to stdout
-write:
-	mov	rax, 1			;sys_write
-	mov	rdi, 1			;stdout
-						;rsi is already buffer adress			
-;	mov	rsi, str		;buffer adress
-;rdx is already buffer size			
-;	mov	rdx, 20			;buffer size
+print:					;ganz klassisch: schreibt unseren Buffer auf stdout
+;					In:	rsi = Bufferpointer, r13 = Anzahl der Bytes, die wir schreiben
+;					Out:	rax = Anzahl der geschriebenen Bytes
+	sub		rsi, r13	;da rsi gerade aufs Ende zeigt ('\0'), addieren wir r13 > rsi zeigt auf Anfang des Buffers
+	mov		rax, 1		;fd = stdout
+	mov		rdi, 1		;sys write
+	mov		rdx, r13	;Anzahl der Bytes
 	syscall
-	mov	rsi, newline
-	mov	rdx, 1
-	syscall
-	ret
+	add		rsi, r13	;rsi zeigt aufs Ende des Buffers
+	xor		r13, r13	;counter wieder auf 0
 
-	;exit program:
+printNewL:				;schreibt 'Enter' ans Ende einer Dezimalzahl
+;					In: rdi = sys write (1)
+;					Out: rax = Anzahl der geschriebenen Bytes
+
+	mov		rax, 1		;fd = stdout
+	mov		rdx, 1		;Anzahl der zu schreibenden Bytes
+	mov		r12, rsi	;temporäres Speichern der Bufferadresse in r12
+	mov		rsi, newl	;rsi zeigt auf 'newl'-Buffer
+	syscall
+	mov		rsi, r12	;r12 wieder in rsi laden
+
+calcFibo:				;hier errechnen wir die nächste Zahl der Fibonacci-Reihe, die letzten beiden Zahlen addiert ergeben die neue Zahl
+;;In: r15 (a) = alte, hohe Zahl, r14 (b) = alte, niedrige Zahl
+;Out: r15 = neue, hohe Zahl, r14 = neue, niedrige Zahl
+
+	mov		r11, r15	;c = a		> temp a in c speichern
+	add		r15, r14	;a = a + b	> neue, hohe Zahl
+	mov		r14, r11	;b = c		> neue, niedrige Zahl (alte, hohe Zahl)
+
+evalProgress:				;wir evaluieren, wie viele Zahlen wir schon haben und setzen ein Maximum
+
+	inc		r10		;zählt bereits geschriebene Zahlen
+	cmp		r10, 50		;Wenn wir 50 Zahlen geschrieben haben:
+	je		exit		;gehe zu 'exit', ansonsten einfach weiter machen:
+
+	mov		rax, r15	;rax mit neuer Zahl füllen, Vorbereitung für itoa > buflen > print
+	mov		rdi, 10		;Vorbereitung für Division
+	jmp		itoa		;mit neuen Werten gehen wir wieder zu itoa
+
 exit:
-	mov	rdi, 0			;exit code
-	mov	rax, 60			;syscall exit number
+	mov		rax, 60
+	mov		rdi, 0
 	syscall
+
