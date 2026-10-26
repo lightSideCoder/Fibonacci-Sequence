@@ -43,7 +43,7 @@ print:						;ganz klassisch: schreibt unseren Buffer auf stdout
 ;Out:	rax = Anzahl der geschriebenen Bytes
 
 	mov		rdi, 1			;stdout fd
-	add		rsi, r13		;da rsi gerade aufs Ende zeigt ('\0'), addieren wir r13 > rsi zeigt auf Anfang des Buffers
+	sub		rsi, r13		;da rsi gerade aufs Ende zeigt ('\0'), subtrahieren wir r13 > rsi zeigt auf Anfang des Buffers
 	mov		rdx, r13		;Anzahl der Bytes
 	mov		rax, 1			;write call
 	syscall
